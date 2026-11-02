@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snowflake Schema — A Bauhaus Explainer</title>
+<style>
+  :root{
+    --red:#E1341E;
+    --yellow:#F7C400;
+    --blue:#1B4FD8;
+    --ink:#12100E;
+    --paper:#F5F2EA;
+    --grey:#8C8676;
+    --line:3px solid var(--ink);
+    --font:"Futura","Jost","Century Gothic","Trebuchet MS",system-ui,sans-serif;
+    --mono:"IBM Plex Mono","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font);
+    font-size:16px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.05;text-transform:uppercase;}
+  h1{font-size:clamp(2.2rem,6vw,4.6rem);}
+  h2{font-size:clamp(1.5rem,3vw,2.3rem);}
+  h3{font-size:1.05rem;letter-spacing:.02em;}
+  p{margin:.6rem 0 1rem;}
+  a{color:var(--blue);}
+  code,pre{font-family:var(--mono);}
+
+  /* ---------- masthead ---------- */
+  header.masthead{
+    border-bottom:var(--line);
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:0;
+  }
+  .mh-title{
+    grid-column:1/9;
+    padding:clamp(1.4rem,4vw,3rem);
+    border-right:var(--line);
+  }
+  .mh-title .kicker{
+    font-size:.72rem;letter-spacing:.28em;text-transform:uppercase;
+    display:flex;align-items:center;gap:.6rem;margin-bottom:1.2rem;color:var(--grey);
+  }
+  .mh-title p.lede{max-width:46ch;font-size:1.02rem;margin-top:1.2rem;}
+  .mh-shapes{
+    grid-column:9/13;
+    display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr 1fr;
+    background:var(--ink);
+    gap:var(--line);
+  }
+  .shape{display:flex;align-items:center;justify-content:center;background:var(--paper);}
+  .shape:nth-child(2){background:var(--yellow);}
+  .shape:nth-child(3){background:var(--red);}
+  .shape:nth-child(4){background:var(--blue);}
+
+  /* ---------- nav ---------- */
+  nav.rail{
+    position:sticky;top:0;z-index:20;
+    background:var(--paper);
+    border-bottom:var(--line);
+    display:flex;flex-wrap:wrap;
+  }
+  nav.rail button{
+    font-family:var(--font);
+    font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+    font-size:.75rem;
+    background:transparent;border:0;border-right:var(--line);
+    padding:.85rem 1.1rem;cursor:pointer;color:var(--ink);
+  }
+  nav.rail button:hover{background:var(--yellow);}
+  nav.rail button[aria-selected="true"]{background:var(--ink);color:var(--paper);}
+
+  /* ---------- layout ---------- */
+  main{max-width:1240px;margin:0 auto;padding:clamp(1rem,3vw,2.4rem);}
+  section[hidden]{display:none;}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:1.2rem;}
+  .card{
+    border:var(--line);
+    background:#fff;
+    padding:1.2rem;
+  }
+  .card.flat{background:var(--paper);}
+  .card h3{margin-bottom:.5rem;}
+  .span4{grid-column:span 4;}
+  .span5{grid-column:span 5;}
+  .span6{grid-column:span 6;}
+  .span7{grid-column:span 7;}
+  .span8{grid-column:span 8;}
+  .span12{grid-column:span 12;}
+  @media(max-width:900px){
+    .span4,.span5,.span6,.span7,.span8{grid-column:span 12;}
+    .mh-title{grid-column:1/13;border-right:0;border-bottom:var(--line);}
+    .mh-shapes{grid-column:1/13;height:160px;}
+  }
+  .tag{
+    display:inline-block;font-size:.64rem;letter-spacing:.18em;text-transform:uppercase;
+    border:2px solid var(--ink);padding:.15rem .45rem;margin-bottom:.6rem;font-weight:700;
+  }
+  .tag.red{background:var(--red);color:#fff;border-color:var(--red);}
+  .tag.blue{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .tag.yellow{background:var(--yellow);}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    font-family:var(--font);font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+    font-size:.74rem;padding:.55rem .9rem;border:3px solid var(--ink);
+    background:#fff;color:var(--ink);cursor:pointer;transition:transform .08s;
+  }
+  .btn:hover{background:var(--yellow);}
+  .btn:active{transform:translate(2px,2px);}
+  .btn[aria-pressed="true"],.btn.on{background:var(--ink);color:var(--paper);}
+  .btn.blue[aria-pressed="true"],.btn.blue.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .btn.red[aria-pressed="true"],.btn.red.on{background:var(--red);border-color:var(--red);color:#fff;}
+  .btnrow{display:flex;flex-wrap:wrap;gap:.5rem;margin:.4rem 0 .8rem;}
+
+  /* ---------- generic table ---------- */
+  table.data{border-collapse:collapse;width:100%;font-size:.82rem;}
+  table.data th,table.data td{border:2px solid var(--ink);padding:.34rem .5rem;text-align:left;white-space:nowrap;}
+  table.data th{background:var(--ink);color:var(--paper);text-transform:uppercase;letter-spacing:.06em;font-size:.68rem;}
+  table.data tbody tr:nth-child(even){background:#EDE9DE;}
+  table.data td.num{text-align:right;font-family:var(--mono);}
+  .scroller{overflow:auto;max-height:340px;border:0;}
+  .key{font-weight:800;}
+  .key::after{content:" \25C6";color:var(--blue);font-size:.7em;}
+  .fk::after{content:" \25C7";color:var(--red);font-size:.7em;}
+  .legend{font-size:.74rem;color:var(--grey);margin-top:.5rem;}
+  .legend b{color:var(--ink);}
+
+  /* ---------- code ---------- */
+  pre.code{
+    background:var(--ink);color:#F3F0E7;padding:.9rem;overflow:auto;
+    font-size:.78rem;line-height:1.5;border-left:8px solid var(--yellow);margin:0;
+  }
+  textarea.sql{
+    width:100%;min-height:120px;background:var(--ink);color:#F3F0E7;
+    font-family:var(--mono);font-size:.8rem;padding:.9rem;border:3px solid var(--ink);
+    border-left:8px solid var(--blue);resize:vertical;
+  }
+  textarea.sql:focus{outline:3px solid var(--yellow);outline-offset:-3px;}
+
+  /* ---------- svg diagram ---------- */
+  .diagram-wrap{border:var(--line);background:#fff;padding:.6rem;}
+  svg.erd{width:100%;height:auto;display:block;}
+  svg.erd .node rect{
+    fill:#fff;stroke:var(--ink);stroke-width:2.5;cursor:pointer;
+    transition:fill .12s;
+  }
+  svg.erd .node:hover rect{fill:var(--yellow);}
+  svg.erd .node.active rect{fill:var(--red);}
+  svg.erd .node.active text{fill:#fff;}
+  svg.erd .node text{font-family:var(--font);font-weight:800;font-size:12px;
+    text-transform:uppercase;letter-spacing:.04em;pointer-events:none;}
+  svg.erd .node text.sub{font-weight:500;font-size:9.5px;letter-spacing:0;fill:var(--grey);}
+  svg.erd .node.active text.sub{fill:#F7D9D3;}
+  svg.erd .fact rect{fill:var(--ink);}
+  svg.erd .fact text{fill:#fff;}
+  svg.erd .fact text.sub{fill:#C9C4B6;}
+  svg.erd .fact:hover rect{fill:#2C2A26;}
+  svg.erd .fact.active rect{fill:var(--blue);}
+  svg.erd .edge{stroke:var(--ink);stroke-width:2.5;fill:none;}
+  svg.erd .edge.snow{stroke:var(--red);stroke-dasharray:7 5;}
+  svg.erd .cardinality{font-family:var(--mono);font-size:11px;fill:var(--red);font-weight:700;}
+  svg.erd.hide-snow .snowflake-only{opacity:0;pointer-events:none;}
+
+  /* ---------- panel ---------- */
+  .panel{border-left:10px solid var(--blue);}
+  .panel ul{margin:.4rem 0 .8rem;padding-left:1.1rem;font-size:.88rem;}
+  .panel li{margin:.25rem 0;}
+  .panel .mono{font-family:var(--mono);font-size:.78rem;}
+
+  /* ---------- normalisation steps ---------- */
+  .steps{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;}
+  .stepbtn{
+    flex:1 1 130px;border:3px solid var(--ink);background:#fff;padding:.6rem;
+    font-family:var(--font);font-weight:800;text-transform:uppercase;font-size:.7rem;
+    cursor:pointer;text-align:left;letter-spacing:.04em;
+  }
+  .stepbtn span{display:block;font-weight:600;text-transform:none;letter-spacing:0;
+    font-size:.72rem;color:var(--grey);margin-top:.2rem;}
+  .stepbtn[aria-pressed="true"]{background:var(--ink);color:var(--paper);}
+  .stepbtn[aria-pressed="true"] span{color:var(--yellow);}
+  .stepbtn:hover{background:var(--yellow);}
+  .stepbtn[aria-pressed="true"]:hover{background:var(--ink);}
+
+  /* ---------- quiz ---------- */
+  .q{border-top:var(--line);padding:1rem 0;}
+  .q:first-child{border-top:0;}
+  .q h3{margin-bottom:.6rem;}
+  .opt{
+    display:block;width:100%;text-align:left;border:2px solid var(--ink);background:#fff;
+    font-family:var(--font);font-size:.86rem;padding:.5rem .7rem;margin:.3rem 0;cursor:pointer;
+  }
+  .opt:hover{background:var(--yellow);}
+  .opt.correct{background:#CFE8CF;border-color:#1C7A1C;}
+  .opt.wrong{background:#F6D2CC;border-color:var(--red);}
+  .opt:disabled{cursor:default;}
+  .why{font-size:.82rem;border-left:6px solid var(--yellow);padding-left:.7rem;margin-top:.5rem;}
+  .score{font-weight:800;font-size:1.1rem;margin-top:1rem;}
+  .statusbar{font-family:var(--mono);font-size:.78rem;color:var(--grey);margin:.5rem 0 0;}
+  footer{border-top:var(--line);margin-top:2rem;padding:1.4rem clamp(1rem,3vw,2.4rem);
+    font-size:.75rem;color:var(--grey);max-width:1240px;margin-left:auto;margin-right:auto;}
+  .hint{font-size:.76rem;color:var(--grey);}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="mh-title">
+    <div class="kicker">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="#E1341E"/></svg>
+      Bauhaus digital &nbsp;·&nbsp; Data modelling
+    </div>
+    <h1>The Snowflake<br>Schema</h1>
+    <p class="lede">Databases reduced to form and function: tables, keys, normalisation — and the
+    dimensional pattern that splits dimensions into the shape of a snowflake. Click, query, break things.</p>
+  </div>
+  <div class="mh-shapes" aria-hidden="true">
+    <div class="shape"><svg width="46" height="46" viewBox="0 0 46 46"><rect x="1" y="1" width="44" height="44" fill="none" stroke="#12100E" stroke-width="6"/></svg></div>
+    <div class="shape"><svg width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="23" r="20" fill="none" stroke="#12100E" stroke-width="6"/></svg></div>
+    <div class="shape"><svg width="46" height="46" viewBox="0 0 46 46"><path d="M23 4 L44 42 L2 42 Z" fill="none" stroke="#fff" stroke-width="6"/></svg></div>
+    <div class="shape"><svg width="46" height="46" viewBox="0 0 46 46"><rect x="1" y="1" width="44" height="44" fill="none" stroke="#fff" stroke-width="6"/></svg></div>
+  </div>
+</header>
+
+<nav class="rail" role="tablist" aria-label="Sections">
+  <button role="tab" id="tab-notions"  aria-controls="s-notions"  aria-selected="true">01 Notions</button>
+  <button role="tab" id="tab-star"     aria-controls="s-star"     aria-selected="false">02 Star vs Snowflake</button>
+  <button role="tab" id="tab-diagram"  aria-controls="s-diagram"  aria-selected="false">03 The Schema</button>
+  <button role="tab" id="tab-norm"     aria-controls="s-norm"     aria-selected="false">04 Normalisation</button>
+  <button role="tab" id="tab-sql"      aria-controls="s-sql"      aria-selected="false">05 SQL Lab</button>
+  <button role="tab" id="tab-quiz"     aria-controls="s-quiz"     aria-selected="false">06 Quiz</button>
+</nav>
+
+<main>
+
+<!-- ============ 01 NOTIONS ============ -->
+<section id="s-notions" role="tabpanel" aria-labelledby="tab-notions">
+  <div class="grid">
+    <div class="card span7">
+      <span class="tag blue">Interactive table</span>
+      <h2>What is a database, really</h2>
+      <p>A relational database stores facts in <b>tables</b>. A table is a grid: each
+      <b>column</b> is an attribute with a fixed type, each <b>row</b> is one record.
+      Click a column header or a row below to see what it is.</p>
+      <div class="scroller">
+        <table class="data" id="notionTable">
+          <thead>
+            <tr>
+              <th data-term="column">store_key</th>
+              <th data-term="column">store</th>
+              <th data-term="column">city</th>
+              <th data-term="column">opened</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-term="row">
+              <td class="key">201</td><td>Paris République</td><td>Paris</td><td>2019-04-02</td>
+            </tr>
+            <tr data-term="row">
+              <td class="key">202</td><td>Lyon Part-Dieu</td><td>Lyon</td><td>2021-09-14</td>
+            </tr>
+            <tr data-term="row">
+              <td class="key">203</td><td>Lille Centre</td><td>Lille</td><td>2023-01-30</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="legend"><b>&#9670;</b> primary key &nbsp;·&nbsp; <b>&#9671;</b> foreign key &nbsp;·&nbsp;
+      each value in a cell is atomic: one city, not "Paris, Lille".</p>
+    </div>
+
+    <div class="card span5 panel" id="notionPanel" aria-live="polite">
+      <span class="tag yellow">Definition</span>
+      <h3 id="npTitle">Pick something</h3>
+      <p id="npBody">Click any header or row in the table on the left. The vocabulary of relational
+      databases is small and precise — it repays ten minutes of attention.</p>
+    </div>
+
+    <div class="card span4">
+      <span class="tag red">Key</span>
+      <h3>Primary key</h3>
+      <p>A column (or set of columns) that is unique and never null. It names every row exactly once.
+      <span class="mono">store_key = 201</span> identifies one store, forever.</p>
+    </div>
+    <div class="card span4">
+      <span class="tag red">Reference</span>
+      <h3>Foreign key</h3>
+      <p>A column whose values point at another table's primary key. In
+      <span class="mono">fact_sales</span>, <span class="mono">store_key</span> is a foreign key into
+      <span class="mono">dim_store</span>. That single line is what makes a schema a schema.</p>
+    </div>
+    <div class="card span4">
+      <span class="tag red">Cardinality</span>
+      <h3>One-to-many</h3>
+      <p>One store holds many sales; each sale belongs to exactly one store. Drawing that relation as
+      <span class="mono">1 → N</span> is the whole art of the diagram on tab 03.</p>
+    </div>
+
+    <div class="card span12 flat">
+      <h3>Three properties worth internalising</h3>
+      <div class="grid">
+        <div class="span4"><b>Redundancy costs.</b><p class="hint">If the string "Île-de-France" is written on ten million rows
+        and the region is renamed, you have ten million updates and a chance of disagreement.</p></div>
+        <div class="span4"><b>Constraints are documentation.</b><p class="hint">Types, keys and foreign keys are executable
+        claims about the world. A database that accepts nonsense is a database that will contain nonsense.</p></div>
+        <div class="span4"><b>Queries follow shape.</b><p class="hint">The number of joins a question needs is decided by the
+        schema, not by the query writer. That is why star and snowflake differ in practice.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 STAR VS SNOWFLAKE ============ -->
+<section id="s-star" role="tabpanel" aria-labelledby="tab-star" hidden>
+  <div class="card span12">
+    <span class="tag blue">Compare</span>
+    <h2>Star and snowflake: two answers to one question</h2>
+    <p>Both are <b>dimensional models</b>: a central <b>fact table</b> holding measures and foreign keys,
+    surrounded by <b>dimension tables</b> holding descriptive attributes. The question they answer
+    differently is: <em>what happens when a dimension itself contains redundancy?</em></p>
+  </div>
+
+  <div class="btnrow" style="margin-top:1.2rem">
+    <button class="btn blue" id="btnStar" aria-pressed="true">Star schema</button>
+    <button class="btn red" id="btnSnow" aria-pressed="false">Snowflake schema</button>
+  </div>
+
+  <div class="grid" id="compareWrap">
+    <!-- STAR -->
+    <div class="card span6" id="cardStar">
+      <h3>Star &mdash; dimensions kept flat</h3>
+      <p><span class="mono">dim_product</span> carries <em>every</em> descriptive attribute, including the
+      category, its department, the supplier and the supplier's country. One join reaches them all.</p>
+      <table class="data">
+        <thead><tr><th>product_key</th><th>product</th><th>category</th><th>department</th><th>supplier</th></tr></thead>
+        <tbody>
+          <tr><td class="key">101</td><td>Espresso machine</td><td>Kitchen</td><td>Home</td><td>Barista Works</td></tr>
+          <tr><td class="key">102</td><td>Drip coffee maker</td><td>Kitchen</td><td>Home</td><td>Barista Works</td></tr>
+          <tr><td class="key">103</td><td>Milk frother</td><td>Kitchen</td><td>Home</td><td>Frothly</td></tr>
+          <tr><td class="key">104</td><td>Desk lamp</td><td>Lighting</td><td>Home</td><td>Lumen Co</td></tr>
+        </tbody>
+      </table>
+      <p class="legend">"Kitchen" repeats on rows 101–103. In a star schema that is accepted on purpose.</p>
+    </div>
+
+    <!-- SNOWFLAKE -->
+    <div class="card span6" id="cardSnow">
+      <h3>Snowflake &mdash; dimensions normalised further</h3>
+      <p>The repeating attributes are pulled out into sub-dimensions. To reach a category you now chain
+      <span class="mono">fact → product → category</span>.</p>
+      <table class="data">
+        <thead><tr><th>product_key</th><th>product</th><th>category_key</th><th>supplier_key</th></tr></thead>
+        <tbody>
+          <tr><td class="key">101</td><td>Espresso machine</td><td class="fk">10</td><td class="fk">1</td></tr>
+          <tr><td class="key">102</td><td>Drip coffee maker</td><td class="fk">10</td><td class="fk">1</td></tr>
+          <tr><td class="key">103</td><td>Milk frother</td><td class="fk">10</td><td class="fk">2</td></tr>
+          <tr><td class="key">104</td><td>Desk lamp</td><td class="fk">20</td><td class="fk">3</td></tr>
+        </tbody>
+      </table>
+      <table class="data" style="margin-top:.6rem">
+        <thead><tr><th>category_key</th><th>category</th><th>department</th></tr></thead>
+        <tbody>
+          <tr><td class="key">10</td><td>Kitchen</td><td>Home</td></tr>
+          <tr><td class="key">20</td><td>Lighting</td><td>Home</td></tr>
+        </tbody>
+      </table>
+      <p class="legend">"Kitchen" is written once. Depth replaces repetition.</p>
+    </div>
+
+    <div class="card span12 flat">
+      <h3>Trade-offs, plainly</h3>
+      <table class="data">
+        <thead><tr><th>&nbsp;</th><th>Star schema</th><th>Snowflake schema</th></tr></thead>
+        <tbody>
+          <tr><th>Storage</th><td>More redundancy</td><td>Less redundancy, smaller dimension footprint</td></tr>
+          <tr><th>Queries</th><td>Fewer joins, simpler SQL</td><td>More joins, longer SQL, more windows of error</td></tr>
+          <tr><th>Maintenance</th><td>One row per attribute change; wider tables</td><td>Change a category once, affects everybody</td></tr>
+          <tr><th>Modeling origin</th><td>Kimball dimensional style</td><td>Third normal form applied to dimensions</td></tr>
+          <tr><th>Typical engines</th><td>Columnar warehouses, BI semantic layers</td><td>Operational cores, Inmon-style warehouses</td></tr>
+        </tbody>
+      </table>
+      <p class="hint" style="margin-top:.6rem">Neither is correct in the abstract. The engine's cost of a join
+      decides which one is cheap where you are running.</p>
+    </div>
+
+    <div class="card span12">
+      <h3>The <em>snowflake</em> metaphor</h3>
+      <p>Draw the foreign-key graph and the shape appears: from the fact table, each dimension branches into
+      further sub-dimensions, which may branch again. The outline is six-fold and crystalline rather than
+      a single point of light. It is a diagrammatic coincidence that happens to be memorable — and it is
+      unrelated to the cloud data warehouse that borrowed the name.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 DIAGRAM ============ -->
+<section id="s-diagram" role="tabpanel" aria-labelledby="tab-diagram" hidden>
+  <div class="card span12" style="margin-bottom:1.2rem">
+    <span class="tag blue">Click any table</span>
+    <h2>The schema, drawn</h2>
+    <p>Grain is the first decision: <b>one row of <span class="mono">fact_sales</span> = one product, in one store,
+    on one day</b>. Everything else follows. Toggle the mode to watch the snowflake branches appear and disappear.</p>
+    <div class="btnrow">
+      <button class="btn blue on" id="btnDiagSnow" aria-pressed="true">Snowflake (3NF)</button>
+      <button class="btn" id="btnDiagStar" aria-pressed="false">Star (denormalised)</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="span8">
+      <div class="diagram-wrap">
+        <svg class="erd" id="erd" viewBox="0 0 900 520" role="img" aria-label="Snowflake schema diagram">
+          <!-- edges -->
+          <path class="edge" d="M210,175 L380,230"/>
+          <path class="edge" d="M210,65 L380,196"/>
+          <path class="edge" d="M700,145 L570,230"/>
+          <path class="edge snowflake-only" d="M125,210 L125,250"/>
+          <path class="edge snowflake-only" d="M40,175 L14,175 L14,395 L40,395"/>
+          <path class="edge snowflake-only" d="M870,145 L886,145 L886,285 L870,285"/>
+          <text class="cardinality" x="286" y="196">1 &#8594; N</text>
+          <text class="cardinality" x="286" y="118">1 &#8594; N</text>
+          <text class="cardinality" x="628" y="182">1 &#8594; N</text>
+          <text class="cardinality snowflake-only" x="132" y="236">1 &#8594; N</text>
+          <text class="cardinality snowflake-only" x="22" y="286">1 &#8594; N</text>
+          <text class="cardinality snowflake-only" x="858" y="208">1 &#8594; N</text>
+
+          <!-- fact -->
+          <g class="node fact" data-node="fact_sales">
+            <rect x="380" y="180" width="190" height="120"/>
+            <text x="396" y="206">fact_sales</text>
+            <text class="sub" x="396" y="226">sale_id (PK)</text>
+            <text class="sub" x="396" y="243">date_key, product_key,</text>
+            <text class="sub" x="396" y="260">store_key (FK)</text>
+            <text class="sub" x="396" y="281">units, revenue (measures)</text>
+          </g>
+
+          <!-- left branch -->
+          <g class="node" data-node="dim_date">
+            <rect x="40" y="30" width="170" height="70"/>
+            <text x="54" y="56">dim_date</text>
+            <text class="sub" x="54" y="76">date_key, full_date,</text>
+            <text class="sub" x="54" y="90">month, quarter, year</text>
+          </g>
+          <g class="node" data-node="dim_product">
+            <rect x="40" y="140" width="170" height="70"/>
+            <text x="54" y="166">dim_product</text>
+            <text class="sub" x="54" y="186">product_key, product,</text>
+            <text class="sub" x="54" y="200">brand, category_key (FK)</text>
+          </g>
+          <g class="node snowflake-only" data-node="dim_category">
+            <rect x="40" y="250" width="170" height="70"/>
+            <text x="54" y="276">dim_category</text>
+            <text class="sub" x="54" y="296">category_key, category,</text>
+            <text class="sub" x="54" y="310">department</text>
+          </g>
+          <g class="node snowflake-only" data-node="dim_supplier">
+            <rect x="40" y="360" width="170" height="70"/>
+            <text x="54" y="386">dim_supplier</text>
+            <text class="sub" x="54" y="406">supplier_key, supplier,</text>
+            <text class="sub" x="54" y="420">country</text>
+          </g>
+
+          <!-- right branch -->
+          <g class="node" data-node="dim_store">
+            <rect x="700" y="110" width="170" height="70"/>
+            <text x="714" y="136">dim_store</text>
+            <text class="sub" x="714" y="156">store_key, store,</text>
+            <text class="sub" x="714" y="170">opened, city_key (FK)</text>
+          </g>
+          <g class="node snowflake-only" data-node="dim_city">
+            <rect x="700" y="250" width="170" height="70"/>
+            <text x="714" y="276">dim_city</text>
+            <text class="sub" x="714" y="296">city_key, city,</text>
+            <text class="sub" x="714" y="310">region</text>
+          </g>
+        </svg>
+      </div>
+      <p class="legend"><b>&#9670;</b> primary key &nbsp;·&nbsp; <b>&#9671;</b> foreign key &nbsp;·&nbsp;
+      red dashed edges are the snowflake branches: dimensions pointing at other dimensions.</p>
+    </div>
+
+    <div class="span4">
+      <div class="card panel" id="erdPanel" aria-live="polite">
+        <span class="tag yellow">Selected</span>
+        <h3 id="epTitle">fact_sales</h3>
+        <p id="epGrain"></p>
+        <ul id="epCols"></ul>
+        <p class="mono" id="epNote"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 NORMALISATION ============ -->
+<section id="s-norm" role="tabpanel" aria-labelledby="tab-norm" hidden>
+  <div class="card span12" style="margin-bottom:1.2rem">
+    <span class="tag blue">Step through it</span>
+    <h2>Normalisation, and how it produces a snowflake</h2>
+    <p>Normalisation is the discipline of removing redundancy by moving attributes to where their key
+    lives. Apply it to a dimension and you have built a snowflake, whether or not you intended to.</p>
+  </div>
+
+  <div class="steps" role="group" aria-label="Normalisation steps">
+    <button class="stepbtn" id="nb0" aria-pressed="true" data-step="0">0 · Flat file<span>Everything in one table</span></button>
+    <button class="stepbtn" id="nb1" aria-pressed="false" data-step="1">1NF<span>Atomic values</span></button>
+    <button class="stepbtn" id="nb2" aria-pressed="false" data-step="2">2NF<span>No partial dependencies</span></button>
+    <button class="stepbtn" id="nb3" aria-pressed="false" data-step="3">3NF<span>No transitive dependencies</span></button>
+  </div>
+
+  <div class="grid">
+    <div class="span7">
+      <div class="card">
+        <h3 id="normTitle">Step 0 &mdash; the flat file</h3>
+        <div class="scroller" id="normTable"></div>
+      </div>
+    </div>
+    <div class="span5">
+      <div class="card panel" id="normPanel" aria-live="polite">
+        <h3 id="normWhat">What is wrong here</h3>
+        <p id="normWhy"></p>
+        <h3 style="margin-top:.8rem">What we do</h3>
+        <p class="mono" id="normHow"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 SQL LAB ============ -->
+<section id="s-sql" role="tabpanel" aria-labelledby="tab-sql" hidden>
+  <div class="card span12" style="margin-bottom:1.2rem">
+    <span class="tag blue">Runs for real</span>
+    <h2>SQL Lab</h2>
+    <p>A miniature in-browser engine over the exact schema drawn on tab 03. Write SQL, press Run, and see
+    the rows. Nothing leaves the page &mdash; there is no server behind this.</p>
+    <p class="hint">Supported: <span class="mono">SELECT</span> with <span class="mono">SUM / COUNT / AVG / MIN / MAX</span>,
+    <span class="mono">AS</span> aliases, a chain of <span class="mono">JOIN … ON</span>,
+    <span class="mono">WHERE</span> with <span class="mono">= != &gt; &lt; &gt;= &lt;= LIKE</span> joined by <span class="mono">AND</span>,
+    <span class="mono">GROUP BY</span>, <span class="mono">ORDER BY … ASC|DESC</span>, <span class="mono">LIMIT</span>.
+    Qualify columns as <span class="mono">table.column</span> when a name exists in more than one table.</p>
+  </div>
+
+  <div class="grid">
+    <div class="span12">
+      <div class="btnrow" id="presets">
+        <button class="btn" data-q="q1">Revenue by category (star)</button>
+        <button class="btn" data-q="q2">Revenue by category (snowflake: + supplier country)</button>
+        <button class="btn" data-q="q3">Monthly trend</button>
+        <button class="btn" data-q="q4">Top products in Paris</button>
+        <button class="btn" data-q="q5">Rows, not sums</button>
+      </div>
+    </div>
+    <div class="span7">
+      <div class="card" style="padding:0">
+        <textarea class="sql" id="sqlBox" spellcheck="false" aria-label="SQL input"></textarea>
+        <div style="display:flex;gap:.5rem;padding:.7rem;border-top:var(--line);background:var(--paper);align-items:center;flex-wrap:wrap">
+          <button class="btn red" id="runSql">Run query</button>
+          <button class="btn" id="clearSql">Clear</button>
+          <span class="statusbar" id="sqlStatus"></span>
+        </div>
+      </div>
+    </div>
+    <div class="span5">
+      <div class="card panel">
+        <span class="tag yellow">Result</span>
+        <div class="scroller" id="sqlOut"><p class="hint">Run a query to see rows here.</p></div>
+      </div>
+    </div>
+    <div class="span12">
+      <div class="card flat">
+        <h3>Available tables</h3>
+        <div class="grid" id="schemaList"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 QUIZ ============ -->
+<section id="s-quiz" role="tabpanel" aria-labelledby="tab-quiz" hidden>
+  <div class="card span12" style="margin-bottom:1.2rem">
+    <span class="tag blue">Six questions</span>
+    <h2>Check the model in your head</h2>
+    <p>One attempt each, with the reasoning shown either way.</p>
+  </div>
+  <div class="grid">
+    <div class="span8">
+      <div class="card" id="quizBox"></div>
+    </div>
+    <div class="span4">
+      <div class="card panel">
+        <span class="tag yellow">Score</span>
+        <h3 id="scoreTitle">0 / 6</h3>
+        <p id="scoreBody" class="hint">Answers appear as you go.</p>
+        <button class="btn" id="resetQuiz">Reset quiz</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Built as a single HTML file. Bauhaus rules applied: primary colours only, geometric primitives,
+  asymmetric grid, no decoration that is not doing work. Schema, data and query engine are illustrative.
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= TABS ================= */
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('nav.rail [role="tab"]'));
+  function selectTab(tab){
+    tabs.forEach(function(t){
+      var on = (t === tab);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      var panel = document.getElementById(t.getAttribute('aria-controls'));
+      if(panel){ panel.hidden = !on; }
+    });
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){ selectTab(t); });
+  });
+
+  /* ================= 01 NOTIONS ================= */
+  var NOTIONS = {
+    column: {
+      title: 'Column (attribute)',
+      body: 'A named, typed slot. Every value in it is of one type — integer, text, date — and every row must hold a value or an explicit NULL. Columns are the vocabulary of a table: they say what can be known about the thing the table stores.'
+    },
+    row: {
+      title: 'Row (record, tuple)',
+      body: 'One complete statement about one instance: this store, this name, this city, this opening date. A table with no rows is a claim about what could be known; a table with rows is what is known.'
+    },
+    pk: {
+      title: 'Primary key',
+      body: 'The column whose value identifies the row and nothing else. Here store_key is the primary key. Surrogate integer keys like this one are preferred in warehouses because they are stable even when the business meaning of a store changes.'
+    },
+    fk: {
+      title: 'Foreign key',
+      body: 'A column pointing into another table primary key, creating a relation. This is the single mechanism from which star and snowflake shapes are built.'
+    }
+  };
+  var npTitle = document.getElementById('npTitle');
+  var npBody  = document.getElementById('npBody');
+  document.querySelectorAll('#notionTable th, #notionTable tbody tr').forEach(function(el){
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', function(){
+      var term = el.getAttribute('data-term');
+      var isHeader = el.tagName === 'TH';
+      var def;
+      if(isHeader && el.textContent.trim() === 'store_key'){
+        def = NOTIONS.pk;
+      } else {
+        def = NOTIONS[term];
+      }
+      if(def){
+        npTitle.textContent = def.title;
+        npBody.textContent = def.body;
+      }
+    });
+  });
+
+  /* ================= 02 STAR vs SNOWFLAKE ================= */
+  var btnStar = document.getElementById('btnStar');
+  var btnSnow = document.getElementById('btnSnow');
+  var cardStar = document.getElementById('cardStar');
+  var cardSnow = document.getElementById('cardSnow');
+  function setCompare(mode){
+    var star = (mode === 'star');
+    btnStar.setAttribute('aria-pressed', star ? 'true' : 'false');
+    btnSnow.setAttribute('aria-pressed', star ? 'false' : 'true');
+    btnStar.classList.toggle('blue', star);
+    btnSnow.classList.toggle('red', !star);
+    cardStar.style.borderColor = star ? '#1B4FD8' : '#12100E';
+    cardStar.style.borderWidth = star ? '6px' : '3px';
+    cardSnow.style.borderColor = star ? '#12100E' : '#E1341E';
+    cardSnow.style.borderWidth = star ? '3px' : '6px';
+  }
+  btnStar.addEventListener('click', function(){ setCompare('star'); });
+  btnSnow.addEventListener('click', function(){ setCompare('snow'); });
+
+  /* ================= 03 DIAGRAM ================= */
+  var MODELS = {
+    fact_sales: {
+      title: 'fact_sales &mdash; the fact table',
+      grain: 'Grain: one row = one product, sold in one store, on one date. State the grain in words before writing a single column.',
+      cols: ['sale_id — surrogate primary key',
+             'date_key — FK → dim_date',
+             'product_key — FK → dim_product',
+             'store_key — FK → dim_store',
+             'units — measure, additive',
+             'revenue — measure, additive'],
+      note: 'Measures are numbers you can sum. Keys carry no business meaning and never change.'
+    },
+    dim_date: {
+      title: 'dim_date',
+      grain: 'Grain: one row = one calendar day.',
+      cols: ['date_key — PK, integer like 20250115',
+             'full_date — DATE',
+             'month, quarter, year — attributes'],
+      note: 'Generated once, filled for decades ahead, and never rewritten. Every warehouse has this table.'
+    },
+    dim_product: {
+      title: 'dim_product',
+      grain: 'Grain: one row = one sellable product, as currently described.',
+      cols: ['product_key — PK',
+             'product, brand — descriptive attributes',
+             'category_key — FK → dim_category',
+             'supplier_key — FK → dim_supplier'],
+      note: 'In star mode this table absorbs category, department, supplier and country, becoming wider and more repetitive.'
+    },
+    dim_category: {
+      title: 'dim_category &mdash; a snowflake branch',
+      grain: 'Grain: one row = one product category.',
+      cols: ['category_key — PK',
+             'category, department — attributes'],
+      note: 'Exists only in the snowflake. Its reason to exist: "Kitchen" was written on many product rows, and now it is written once.'
+    },
+    dim_supplier: {
+      title: 'dim_supplier &mdash; a snowflake branch',
+      grain: 'Grain: one row = one supplier company.',
+      cols: ['supplier_key — PK',
+             'supplier, country — attributes'],
+      note: 'A second level of depth hanging off dim_product. Depth can continue: a supplier could point at a country table in turn.'
+    },
+    dim_store: {
+      title: 'dim_store',
+      grain: 'Grain: one row = one physical store.',
+      cols: ['store_key — PK',
+             'store, opened — attributes',
+             'city_key — FK → dim_city'],
+      note: 'Stores close and reopen with new names; the surrogate key survives the rename.'
+    },
+    dim_city: {
+      title: 'dim_city &mdash; a snowflake branch',
+      grain: 'Grain: one row = one city.',
+      cols: ['city_key — PK',
+             'city, region — attributes'],
+      note: 'Grouping sales by region means one extra join: fact → store → city.'
+    }
+  };
+  var erd = document.getElementById('erd');
+  var epTitle = document.getElementById('epTitle');
+  var epGrain = document.getElementById('epGrain');
+  var epCols  = document.getElementById('epCols');
+  var epNote  = document.getElementById('epNote');
+  function showNode(key){
+    var m = MODELS[key];
+    if(!m){ return; }
+    document.querySelectorAll('#erd .node').forEach(function(g){
+      g.classList.toggle('active', g.getAttribute('data-node') === key);
+    });
+    epTitle.innerHTML = m.title;
+    epGrain.textContent = m.grain;
+    epCols.innerHTML = m.cols.map(function(c){ return '<li>' + c + '</li>'; }).join('');
+    epNote.textContent = m.note;
+  }
+  document.querySelectorAll('#erd .node').forEach(function(g){
+    g.addEventListener('click', function(){ showNode(g.getAttribute('data-node')); });
+  });
+  showNode('fact_sales');
+
+  var btnDiagSnow = document.getElementById('btnDiagSnow');
+  var btnDiagStar = document.getElementById('btnDiagStar');
+  function setDiagram(mode){
+    var snow = (mode === 'snow');
+    erd.classList.toggle('hide-snow', !snow);
+    btnDiagSnow.setAttribute('aria-pressed', snow ? 'true' : 'false');
+    btnDiagStar.setAttribute('aria-pressed', snow ? 'false' : 'true');
+    btnDiagSnow.classList.toggle('blue', snow);
+    btnDiagStar.classList.toggle('on', !snow);
+    if(!snow){
+      showNode('dim_product');
+      epGrain.textContent = 'Star mode: one wide row per product, repeating category, department, supplier and country.';
+      epNote.textContent = 'Three tables are hidden. Their attributes have been folded back into dim_product and dim_store, so every question needs one join instead of three.';
+    } else {
+      showNode('fact_sales');
+    }
+  }
+  btnDiagSnow.addEventListener('click', function(){ setDiagram('snow'); });
+  btnDiagStar.addEventListener('click', function(){ setDiagram('star'); });
+
+  /* ================= 04 NORMALISATION ================= */
+  var NORM = [
+    {
+      title: 'Step 0 &mdash; the flat file',
+      head: ['order_id','product','category','department','supplier','country','units'],
+      rows: [
+        ['1','Espresso machine','Kitchen','Home','Barista Works','Italy','2'],
+        ['1','Milk frother','Kitchen','Home','Frothly','Belgium','1'],
+        ['2','Espresso machine','Kitchen','Home','Barista Works','Italy','3'],
+        ['3','Desk lamp','Lighting','Home','Lumen Co','Netherlands','4'],
+        ['3','Floor lamp','Lighting','Home','Lumen Co','Netherlands','1'],
+        ['4','Wool throw','Textiles','Living','Nordica','Sweden','2'],
+        ['5','Milk frother','Kitchen','Home','Frothly','Belgium','2']
+      ],
+      what: 'What is wrong here',
+      why: 'Nothing is atomic at the row level and everything repeats: "Kitchen", "Home", "Barista Works" and "Italy" are copied onto every line that mentions them. Rename a supplier country and you must find every copy. This is an update anomaly breeding quietly.',
+      how: 'We start by choosing a key: (order_id, product) identifies a row. That composite key is the lever for the next two steps.'
+    },
+    {
+      title: 'Step 1 &mdash; First normal form',
+      head: ['order_id','product','category','department','supplier','country','units'],
+      rows: [
+        ['1','Espresso machine','Kitchen','Home','Barista Works','Italy','2'],
+        ['1','Milk frother','Kitchen','Home','Frothly','Belgium','1'],
+        ['2','Espresso machine','Kitchen','Home','Barista Works','Italy','3'],
+        ['3','Desk lamp','Lighting','Home','Lumen Co','Netherlands','4'],
+        ['3','Floor lamp','Lighting','Home','Lumen Co','Netherlands','1'],
+        ['4','Wool throw','Textiles','Living','Nordica','Sweden','2'],
+        ['5','Milk frother','Kitchen','Home','Frothly','Belgium','2']
+      ],
+      what: 'Atomic values, no repeating groups',
+      why: 'First normal form asks for one value per cell and no repeating groups. Our flat file already obeys it — each cell holds a single name, and the pairs (order_id, product) each appear once, so the composite key works. 1NF alone fixes almost nothing that was actually hurting us.',
+      how: 'Note what it did NOT fix: category, supplier and country are still copied per line. Those depend on the product, not on the whole key.'
+    },
+    {
+      title: 'Step 2 &mdash; Second normal form',
+      head: ['order_id','product','units'],
+      rows: [['1','Espresso machine','2'],['1','Milk frother','1'],['2','Espresso machine','3'],
+             ['3','Desk lamp','4'],['3','Floor lamp','1'],['4','Wool throw','2'],['5','Milk frother','2']],
+      extra: {
+        head: ['product','category','department','supplier','country'],
+        rows: [['Espresso machine','Kitchen','Home','Barista Works','Italy'],
+               ['Milk frother','Kitchen','Home','Frothly','Belgium'],
+               ['Desk lamp','Lighting','Home','Lumen Co','Netherlands'],
+               ['Floor lamp','Lighting','Home','Lumen Co','Netherlands'],
+               ['Wool throw','Textiles','Living','Nordica','Sweden']]
+      },
+      what: 'No partial dependencies',
+      why: 'In the flat file, category depends on product alone — only half of the composite key (order_id, product). An attribute that depends on part of a composite key is a partial dependency, and 2NF forbids it.',
+      how: 'Split the line from the thing sold. Order lines keep order_id, product and the measure. Product facts move to their own table keyed by product.'
+    },
+    {
+      title: 'Step 3 &mdash; Third normal form (the snowflake)',
+      head: ['product','category_key','supplier_key'],
+      rows: [['Espresso machine','10','1'],['Milk frother','10','2'],['Desk lamp','20','3'],
+             ['Floor lamp','20','3'],['Wool throw','30','4']],
+      extra: {
+        head: ['ref','value','value2'],
+        rows: [['category 10','Kitchen','Home'],['category 20','Lighting','Home'],['category 30','Textiles','Living'],
+               ['supplier 1','Barista Works','Italy'],['supplier 2','Frothly','Belgium'],
+               ['supplier 3','Lumen Co','Netherlands'],['supplier 4','Nordica','Sweden']]
+      },
+      what: 'No transitive dependencies',
+      why: 'department depends on category, and category depends on product. So department depends on product transitively. 3NF says every non-key attribute must depend on the key and nothing but the key.',
+      how: 'Pull category and supplier into their own tables. What remains is dim_product holding keys, dim_category and dim_supplier holding attributes. That is precisely the snowflake: dimensions branching into dimensions.'
+    }
+  ];
+  function renderNorm(step){
+    var s = NORM[step];
+    document.getElementById('normTitle').innerHTML = s.title;
+    var html = '<table class="data"><thead><tr>' +
+      s.head.map(function(h,i){ return '<th>' + h + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      s.rows.map(function(r){
+        return '<tr>' + r.map(function(c,i){
+          var cls = (i === 0 || s.head[i].indexOf('_key') > -1) ? ' class="key"' : '';
+          return '<td' + cls + '>' + c + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table>';
+    if(s.extra){
+      html += '<h3 style="margin-top:1.1rem">' + (step === 2 ? 'product table' : 'dim_category and dim_supplier') + '</h3>';
+      html += '<table class="data"><thead><tr>' +
+        s.extra.head.map(function(h){ return '<th>' + h + '</th>'; }).join('') +
+        '</tr></thead><tbody>' +
+        s.extra.rows.map(function(r){
+          return '<tr>' + r.map(function(c){ return '<td>' + c + '</td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody></table>';
+    }
+    document.getElementById('normTable').innerHTML = html;
+    document.getElementById('normWhat').textContent = s.what;
+    document.getElementById('normWhy').textContent = s.why;
+    document.getElementById('normHow').textContent = s.how;
+    document.querySelectorAll('.stepbtn').forEach(function(b){
+      b.setAttribute('aria-pressed', b.getAttribute('data-step') === String(step) ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('.stepbtn').forEach(function(b){
+    b.addEventListener('click', function(){ renderNorm(parseInt(b.getAttribute('data-step'), 10)); });
+  });
+  renderNorm(0);
+
+  /* ================= 05 SQL LAB ================= */
+  var TABLES = {
+    dim_date: [
+      {date_key:1, full_date:'2025-01-15', month:'January',  quarter:'Q1', year:2025},
+      {date_key:2, full_date:'2025-02-12', month:'February', quarter:'Q1', year:2025},
+      {date_key:3, full_date:'2025-03-08', month:'March',    quarter:'Q1', year:2025},
+      {date_key:4, full_date:'2025-04-21', month:'April',    quarter:'Q2', year:2025},
+      {date_key:5, full_date:'2025-05-05', month:'May',      quarter:'Q2', year:2025},
+      {date_key:6, full_date:'2025-06-18', month:'June',     quarter:'Q2', year:2025}
+    ],
+    dim_product: [
+      {product_key:101, product:'Espresso machine',   brand:'Barista', category_key:10, supplier_key:1},
+      {product_key:102, product:'Drip coffee maker',  brand:'Barista', category_key:10, supplier_key:1},
+      {product_key:103, product:'Milk frother',       brand:'Frothly', category_key:10, supplier_key:2},
+      {product_key:104, product:'Desk lamp',          brand:'Lumen',   category_key:20, supplier_key:3},
+      {product_key:105, product:'Floor lamp',         brand:'Lumen',   category_key:20, supplier_key:3},
+      {product_key:106, product:'Wool throw',         brand:'Nordica', category_key:30, supplier_key:4}
+    ],
+    dim_category: [
+      {category_key:10, category:'Kitchen',  department:'Home'},
+      {category_key:20, category:'Lighting', department:'Home'},
+      {category_key:30, category:'Textiles', department:'Living'}
+    ],
+    dim_supplier: [
+      {supplier_key:1, supplier:'Barista Works', country:'Italy'},
+      {supplier_key:2, supplier:'Frothly',       country:'Belgium'},
+      {supplier_key:3, supplier:'Lumen Co',      country:'Netherlands'},
+      {supplier_key:4, supplier:'Nordica',       country:'Sweden'}
+    ],
+    dim_store: [
+      {store_key:201, store:'Paris République', opened:'2019-04-02', city_key:301},
+      {store_key:202, store:'Lyon Part-Dieu',   opened:'2021-09-14', city_key:302},
+      {store_key:203, store:'Lille Centre',     opened:'2023-01-30', city_key:303},
+      {store_key:204, store:'Nantes Graslin',   opened:'2020-06-11', city_key:304}
+    ],
+    dim_city: [
+      {city_key:301, city:'Paris',  region:'Île-de-France'},
+      {city_key:302, city:'Lyon',   region:'Auvergne-Rhône-Alpes'},
+      {city_key:303, city:'Lille',  region:'Hauts-de-France'},
+      {city_key:304, city:'Nantes', region:'Pays de la Loire'}
+    ],
+    fact_sales: []
+  };
+  var RAW = [
+    [1,1,101,201,2,1240],[2,1,103,201,1,90],[3,2,101,202,3,1860],
+    [4,2,104,203,4,320],[5,3,101,201,1,620],[6,3,105,204,1,450],
+    [7,3,105,203,1,450],[8,3,106,202,2,180],[9,4,104,201,6,480],
+    [10,4,102,204,2,240],[11,4,103,202,3,270],[12,5,101,203,2,1240],
+    [13,5,105,201,1,450],[14,5,106,204,3,270],[15,5,104,204,2,160],
+    [16,6,101,202,4,2480],[17,6,102,201,1,120],[18,6,106,203,1,90],
+    [19,6,103,204,2,180],[20,2,102,201,3,360],[21,1,104,202,1,80],
+    [22,3,102,203,2,240],[23,4,106,201,1,90],[24,5,102,203,1,120],
+    [25,6,104,202,2,160],[26,1,101,204,1,620],[27,6,105,204,2,900],
+    [28,2,106,202,1,90],[29,4,101,203,2,1240],[30,5,103,204,1,90]
+  ];
+  TABLES.fact_sales = RAW.map(function(r){
+    return {sale_id:r[0], date_key:r[1], product_key:r[2], store_key:r[3], units:r[4], revenue:r[5] * 0.1};
+  });
+
+  var AGG = ['SUM','COUNT','AVG','MIN','MAX'];
+  var OPS = ['>=','<=','!=','<>','=','>','<','LIKE'];
+
+  function loadTable(name){
+    var t = TABLES[name];
+    if(!t){ throw new Error('Unknown table: ' + name); }
+    return t.map(function(r){
+      var out = {};
+      for(var k in r){
+        if(Object.prototype.hasOwnProperty.call(r,k)){
+          out[k] = r[k];
+          out[name + '.' + k] = r[k];
+        }
+      }
+      return out;
+    });
+  }
+  function mergeRows(base, extra, tname){
+    var out = {};
+    var k;
+    for(k in base){ if(Object.prototype.hasOwnProperty.call(base,k)){ out[k] = base[k]; } }
+    for(k in extra){ if(Object.prototype.hasOwnProperty.call(extra,k)){ out[tname + '.' + k] = extra[k]; } }
+    for(k in extra){
+      if(Object.prototype.hasOwnProperty.call(extra,k) && !(k in out)){ out[k] = extra[k]; }
+    }
+    return out;
+  }
+  function columnOf(ref){
+    var i = ref.indexOf('.');
+    return i > -1 ? ref.slice(i+1) : ref;
+  }
+  function val(row, ref){
+    if(row[ref] !== undefined){ return row[ref]; }
+    var c = columnOf(ref);
+    return row[c];
+  }
+  function splitTop(s){
+    var out = [], depth = 0, cur = '';
+    for(var i=0;i<s.length;i++){
+      var ch = s[i];
+      if(ch === '('){ depth++; }
+      if(ch === ')'){ depth--; }
+      if(ch === ',' && depth === 0){ out.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    if(cur.trim()){ out.push(cur.trim()); }
+    return out;
+  }
+  function parseExpr(item){
+    var m = item.match(/^([A-Za-z_][\w.]*)\s*\(\s*([\w.]+|\*)\s*\)\s*(?:AS\s+)?([A-Za-z_]\w*)?$/i);
+    if(m){
+      return {
+        raw:item,
+        label:(m[3] || (m[1].toUpperCase() + '(' + m[2] + ')')),
+        agg:m[1].toUpperCase(),
+        col:m[2]
+      };
+    }
+    var s = item.match(/^([\w.]+)(?:\s+(?:AS\s+)?([A-Za-z_]\w*))?$/i);
+    if(s){
+      return {raw:item, label:(s[2] || s[1]), col:s[1]};
+    }
+    throw new Error('Cannot parse select item: ' + item);
+  }
+  function computeAgg(spec, rows){
+    if(spec.agg === 'COUNT' && spec.col === '*'){ return rows.length; }
+    var nums = [];
+    var nonNull = 0;
+    rows.forEach(function(r){
+      var v = val(r, spec.col);
+      if(v !== undefined && v !== null){ nonNull++; }
+      if(typeof v === 'number' && !isNaN(v)){ nums.push(v); }
+    });
+    switch(spec.agg){
+      case 'COUNT': return nonNull;
+      case 'SUM': return nums.reduce(function(a,b){ return a+b; }, 0);
+      case 'AVG': return nums.length ? nums.reduce(function(a,b){ return a+b; },0) / nums.length : null;
+      case 'MIN': return nums.length ? Math.min.apply(null, nums) : null;
+      case 'MAX': return nums.length ? Math.max.apply(null, nums) : null;
+    }
+    throw new Error('Unsupported aggregate: ' + spec.agg);
+  }
+  function stripStrings(s){
+    return s.replace(/'[^']*'/g, "''");
+  }
+  function runQuery(sql){
+    var src = sql.replace(/\s+/g, ' ').trim().replace(/;+$/, '');
+    if(!src){ throw new Error('Empty query.'); }
+    var probe = stripStrings(src);
+    var mFrom = probe.match(/\bFROM\b/i);
+    if(!mFrom){ throw new Error('Every query needs a FROM clause.'); }
+    var iFrom = probe.search(/\bFROM\b/i);
+    var selectPart = src.slice(0, iFrom).replace(/^\s*select\s+/i, function(x){ return ''; });
+    var rest = src.slice(iFrom + 4);
+
+    var mTail = rest.match(/\b(WHERE|GROUP\s+BY|ORDER\s+BY|LIMIT)\b/i);
+    var fromPart = mTail ? rest.slice(0, mTail.index) : rest;
+    var tail = mTail ? rest.slice(mTail.index) : '';
+
+    /* FROM + JOIN chain */
+    var joinRegex = /\bJOIN\s+([A-Za-z_]\w*)\s+ON\s+([\w.]+)\s*=\s*([\w.]+)/gi;
+    var firstMatch = fromPart.match(/^\s*([A-Za-z_]\w*)/);
+    if(!firstMatch){ throw new Error('No table after FROM.'); }
+    var baseName = firstMatch[1];
+    var rows = loadTable(baseName);
+    var joins = [];
+    var jm;
+    joinRegex.lastIndex = 0;
+    while((jm = joinRegex.exec(fromPart)) !== null){
+      var tname = jm[1], leftRef = jm[2], rightRef = jm[3];
+      var leftIsBase = leftRef.split('.')[0] === baseName || leftRef.indexOf('.') === -1;
+      var tableRef = leftIsBase ? rightRef : leftRef;
+      var baseRef  = leftIsBase ? leftRef : rightRef;
+      if(tableRef.split('.')[0] !== tname){
+        var swap = tableRef; tableRef = baseRef; baseRef = swap;
+      }
+      var tRows = loadTable(tname);
+      var idx = {};
+      tRows.forEach(function(tr){
+        var k = String(val(tr, tableRef));
+        if(!idx[k]){ idx[k] = []; }
+        idx[k].push(tr);
+      });
+      var joined = [];
+      rows.forEach(function(r){
+        var keys = idx[String(val(r, baseRef))];
+        if(keys){
+          keys.forEach(function(tr){ joined.push(mergeRows(r, tr, tname)); });
+        }
+      });
+      rows = joined;
+      joins.push(tname);
+    }
+    if(!rows.length){ throw new Error('The join chain produced zero rows — check the ON conditions.'); }
+
+    /* WHERE */
+    var mWhere = tail.match(/\bWHERE\b([\s\S]*?)(?=\bGROUP\s+BY\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i);
+    if(mWhere){
+      var conds = mWhere[1].split(/\bAND\b/i);
+      conds.forEach(function(c){
+        var cm = c.match(/^\s*([\w.]+)\s*(>=|<=|!=|<>|=|>|<|LIKE)\s*(?:'([^']*)'|([\w.]+))\s*$/i);
+        if(!cm){ throw new Error('Cannot parse condition: ' + c.trim()); }
+        var ref = cm[1], op = cm[2].toUpperCase();
+        var target = (cm[3] !== undefined) ? cm[3] : cm[4];
+        var numeric = /^-?\d+(\.\d+)?$/.test(target);
+        rows = rows.filter(function(r){
+          var v = val(r, ref);
+          if(op === 'LIKE'){
+            var pat = String(target).split('%').map(function(p){
+              return p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }).join('.*');
+            return new RegExp('^' + pat + '$', 'i').test(String(v));
+          }
+          var cmp;
+          if(numeric && typeof v === 'number'){ cmp = v - parseFloat(target); }
+          else { cmp = String(v).localeCompare(String(target)); }
+          switch(op){
+            case '=':  return cmp === 0;
+            case '!=': case '<>': return cmp !== 0;
+            case '>':  return cmp > 0;
+            case '<':  return cmp < 0;
+            case '>=': return cmp >= 0;
+            case '<=': return cmp <= 0;
+          }
+          return false;
+        });
+      });
+    }
+
+    /* SELECT items */
+    var selectItems = splitTop(selectPart).map(parseExpr);
+    var mGroup = tail.match(/\bGROUP\s+BY\b([\s\S]*?)(?=\bORDER\s+BY\b|\bLIMIT\b|$)/i);
+    var groupRefs = mGroup ? splitTop(mGroup[1]) : [];
+    selectItems.forEach(function(it){
+      if(it.agg && !groupRefs.length){
+        var anyPlain = selectItems.some(function(o){ return !o.agg; });
+        if(anyPlain){
+          throw new Error('Column "' + selectItems.filter(function(o){ return !o.agg; })[0].col +
+            '" must appear in a GROUP BY clause, or be wrapped in an aggregate.');
+        }
+      }
+    });
+
+    var out = [];
+    if(groupRefs.length){
+      var buckets = {}, order = [];
+      rows.forEach(function(r){
+        var key = groupRefs.map(function(g){ return String(val(r, g)); }).join('\u0001');
+        if(!buckets[key]){ buckets[key] = []; order.push(key); }
+        buckets[key].push(r);
+      });
+      out = order.map(function(k){
+        var grp = buckets[k];
+        var o = {__src: grp[0], __rows: grp};
+        selectItems.forEach(function(it){
+          o[it.label] = it.agg ? computeAgg(it, grp) : val(grp[0], it.col);
+        });
+        return o;
+      });
+    } else {
+      var hasAgg = selectItems.some(function(it){ return !!it.agg; });
+      if(hasAgg){
+        var o = {__src: rows, __rows: rows};
+        selectItems.forEach(function(it){ o[it.label] = computeAgg(it, rows); });
+        out = [o];
+      } else {
+        out = rows.map(function(r){
+          var o = {__src: r, __rows: [r]};
+          selectItems.forEach(function(it){ o[it.label] = val(r, it.col); });
+          return o;
+        });
+      }
+    }
+
+    /* ORDER BY */
+    var mOrder = tail.match(/\bORDER\s+BY\b([\s\S]*?)(?=\bLIMIT\b|$)/i);
+    if(mOrder){
+      var specs = splitTop(mOrder[1]).map(function(s){
+        var parts = s.trim().split(/\s+/);
+        return {ref:parts[0], desc:(parts[1] || '').toUpperCase() === 'DESC'};
+      });
+      specs.reverse().forEach(function(sp){
+        out.sort(function(a,b){
+          function get(o){
+            if(o[sp.ref] !== undefined){ return o[sp.ref]; }
+            if(o.__src && o.__src[sp.ref] !== undefined){ return o.__src[sp.ref]; }
+            var hit = selectItems.filter(function(it){ return it.label === sp.ref; })[0];
+            if(hit && hit.agg){ return computeAgg(hit, o.__rows); }
+            return val(o.__src, sp.ref);
+          }
+          var x = get(a), y = get(b);
+          var c;
+          if(typeof x === 'number' && typeof y === 'number'){ c = x - y; }
+          else { c = String(x).localeCompare(String(y)); }
+          return sp.desc ? -c : c;
+        });
+      });
+    }
+
+    /* LIMIT */
+    var mLimit = tail.match(/\bLIMIT\s+(\d+)/i);
+    if(mLimit){ out = out.slice(0, parseInt(mLimit[1], 10)); }
+
+    var cols = selectItems.map(function(it){ return it.label; });
+    return {
+      cols: cols,
+      rows: out.map(function(o){
+        var r = {};
+        cols.forEach(function(c){ r[c] = o[c]; });
+        return r;
+      }),
+      scanned: rows.length,
+      joins: joins
+    };
+  }
+
+  var sqlBox = document.getElementById('sqlBox');
+  var sqlOut = document.getElementById('sqlOut');
+  var sqlStatus = document.getElementById('sqlStatus');
+
+  function fmt(v){
+    if(v === null || v === undefined){ return '<span style="color:#8C8676">NULL</span>'; }
+    if(typeof v === 'number'){
+      var s = Math.round(v * 100) / 100;
+      return '<span>' + String(s) + '</span>';
+    }
+    return String(v);
+  }
+  function renderResult(res){
+    var html = '<table class="data"><thead><tr>' +
+      res.cols.map(function(c){ return '<th>' + c + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      res.rows.map(function(r){
+        return '<tr>' + res.cols.map(function(c){
+          var numeric = typeof r[c] === 'number';
+          return '<td class="' + (numeric ? 'num' : '') + '">' + fmt(r[c]) + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table>';
+    if(!res.rows.length){ html = '<p class="hint">No rows matched.</p>' + html; }
+    sqlOut.innerHTML = html;
+    sqlStatus.textContent = res.rows.length + ' row(s) · ' + res.scanned +
+      ' joined row(s) scanned' + (res.joins.length ? ' · joins: ' + res.joins.join(', ') : '');
+  }
+  function execute(){
+    try{
+      var res = runQuery(sqlBox.value);
+      renderResult(res);
+    } catch(err){
+      sqlOut.innerHTML = '<p class="mono" style="border-left:6px solid #E1341E;padding-left:.6rem">' +
+        String(err.message) + '</p>';
+      sqlStatus.textContent = 'Query rejected.';
+    }
+  }
+  document.getElementById('runSql').addEventListener('click', execute);
+  document.getElementById('clearSql').addEventListener('click', function(){
+    sqlBox.value = '';
+    sqlOut.innerHTML = '<p class="hint">Run a query to see rows here.</p>';
+    sqlStatus.textContent = '';
+    sqlBox.focus();
+  });
+  sqlBox.addEventListener('keydown', function(e){
+    if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); execute(); }
+  });
+
+  var PRESETS = {
+    q1: "SELECT dim_category.category,\n       SUM(fact_sales.revenue) AS revenue\nFROM fact_sales\n  JOIN dim_product  ON fact_sales.product_key  = dim_product.product_key\n  JOIN dim_category ON dim_product.category_key = dim_category.category_key\nGROUP BY dim_category.category\nORDER BY revenue DESC",
+    q2: "SELECT dim_supplier.country,\n       dim_category.category,\n       SUM(fact_sales.revenue) AS revenue,\n       COUNT(*) AS sales\nFROM fact_sales\n  JOIN dim_product   ON fact_sales.product_key   = dim_product.product_key\n  JOIN dim_category  ON dim_product.category_key  = dim_category.category_key\n  JOIN dim_supplier  ON dim_product.supplier_key  = dim_supplier.supplier_key\nGROUP BY dim_supplier.country, dim_category.category\nORDER BY revenue DESC",
+    q3: "SELECT dim_date.month,\n       SUM(fact_sales.units) AS units\nFROM fact_sales\n  JOIN dim_date ON fact_sales.date_key = dim_date.date_key\nGROUP BY dim_date.month\nORDER BY dim_date.month ASC",
+    q4: "SELECT dim_product.product,\n       dim_store.store,\n       fact_sales.units,\n       fact_sales.revenue\nFROM fact_sales\n  JOIN dim_product ON fact_sales.product_key = dim_product.product_key\n  JOIN dim_store   ON fact_sales.store_key   = dim_store.store_key\nWHERE dim_store.store = 'Paris République'\nORDER BY fact_sales.revenue DESC",
+    q5: "SELECT dim_city.region,\n       dim_product.product,\n       fact_sales.revenue\nFROM fact_sales\n  JOIN dim_product ON fact_sales.product_key = dim_product.product_key\n  JOIN dim_store   ON fact_sales.store_key   = dim_store.store_key\n  JOIN dim_city    ON dim_store.city_key     = dim_city.city_key\nWHERE fact_sales.revenue > 100\nLIMIT 10"
+  };
+  document.querySelectorAll('#presets .btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      sqlBox.value = PRESETS[b.getAttribute('data-q')];
+      execute();
+    });
+  });
+  sqlBox.value = PRESETS.q1;
+
+  /* schema list */
+  var schemaList = document.getElementById('schemaList');
+  schemaList.innerHTML = Object.keys(TABLES).map(function(name){
+    var cols = Object.keys(TABLES[name][0] || {}).join(', ');
+    return '<div class="span4"><div class="card flat" style="padding:.8rem">' +
+      '<h3 style="font-size:.9rem">' + name + '</h3>' +
+      '<p class="mono" style="margin:.3rem 0 0">' + cols + '</p>' +
+      '<p class="hint" style="margin:.3rem 0 0">' + TABLES[name].length + ' rows</p>' +
+      '</div></div>';
+  }).join('');
+
+  /* ================= 06 QUIZ ================= */
+  var QUESTIONS = [
+    {
+      q: 'What does the grain of a fact table describe?',
+      opts: [
+        'The number of rows it holds',
+        'What one single row represents',
+        'The physical storage format on disk'
+      ],
+      a: 1,
+      why: 'Grain answers "one row = what?". Get it wrong and every aggregate downstream is wrong, no matter how the SQL is written.'
+    },
+    {
+      q: 'In a snowflake schema, where does normalisation happen?',
+      opts: [
+        'In the fact table only',
+        'In the dimension tables, which split into sub-dimensions',
+        'Nowhere — snowflake means denormalised'
+      ],
+      a: 1,
+      why: 'The fact table stays lean and keys-only in both patterns. The difference is that snowflake dimensions are normalised into a hierarchy of their own.'
+    },
+    {
+      q: 'Which query reaches a region name from fact_sales in the schema on tab 03?',
+      opts: [
+        'fact_sales → dim_store (region is a column there)',
+        'fact_sales → dim_store → dim_city',
+        'fact_sales → dim_product → dim_city'
+      ],
+      a: 1,
+      why: 'Region lives in dim_city, so you need two hops through dim_store. In star mode region would sit directly on dim_store and one hop would do.'
+    },
+    {
+      q: 'In dim_product, what is category_key?',
+      opts: [
+        'A primary key of dim_product',
+        'A foreign key pointing at dim_category',
+        'A measure'
+      ],
+      a: 1,
+      why: 'A key that points at another table primary key is a foreign key — and a foreign key between two dimensions is exactly what makes the shape a snowflake.'
+    },
+    {
+      q: 'What is the principal cost of a snowflake schema?',
+      opts: [
+        'It cannot store historical data',
+        'It requires more joins, so queries are longer and harder to keep correct',
+        'It loses the ability to group by category'
+      ],
+      a: 1,
+      why: 'Depth buys less redundancy and pays in joins. Whether that is a good trade depends on what a join costs in your engine.'
+    },
+    {
+      q: 'Two products are described as "Kitchen" in dim_product in a star schema. Is that a mistake?',
+      opts: [
+        'Yes — it violates 3NF, so the schema is broken',
+        'No — star schemas deliberately accept redundancy for simpler queries',
+        'Yes, unless the products share a supplier'
+      ],
+      a: 1,
+      why: 'Star schemas trade storage redundancy for query simplicity. The redundancy is a design decision, not an accident — which is why star and snowflake are both defensible.'
+    }
+  ];
+  var quizBox = document.getElementById('quizBox');
+  var scoreTitle = document.getElementById('scoreTitle');
+  var scoreBody = document.getElementById('scoreBody');
+  var answered = 0, correct = 0;
+
+  function buildQuiz(){
+    answered = 0; correct = 0;
+    scoreTitle.textContent = '0 / ' + QUESTIONS.length;
+    scoreBody.textContent = 'Answers appear as you go.';
+    quizBox.innerHTML = QUESTIONS.map(function(item, qi){
+      return '<div class="q" data-q="' + qi + '">' +
+        '<h3>' + (qi + 1) + '. ' + item.q + '</h3>' +
+        item.opts.map(function(o, oi){
+          return '<button class="opt" data-q="' + qi + '" data-o="' + oi + '">' + o + '</button>';
+        }).join('') +
+        '<div class="why" hidden></div>' +
+        '</div>';
+    }).join('');
+
+    quizBox.querySelectorAll('.opt').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var qi = parseInt(btn.getAttribute('data-q'), 10);
+        var oi = parseInt(btn.getAttribute('data-o'), 10);
+        var item = QUESTIONS[qi];
+        var box = quizBox.querySelector('.q[data-q="' + qi + '"]');
+        if(box.getAttribute('data-done')){ return; }
+        box.setAttribute('data-done', '1');
+        box.querySelectorAll('.opt').forEach(function(b, idx){
+          b.disabled = true;
+          if(idx === item.a){ b.classList.add('correct'); }
+          else if(idx === oi){ b.classList.add('wrong'); }
+        });
+        var ok = (oi === item.a);
+        if(ok){ correct++; }
+        answered++;
+        var why = box.querySelector('.why');
+        why.hidden = false;
+        why.innerHTML = '<b>' + (ok ? 'Correct.' : 'Not quite.') + '</b> ' + item.why;
+        scoreTitle.textContent = correct + ' / ' + QUESTIONS.length;
+        scoreBody.textContent = answered === QUESTIONS.length
+          ? (correct === QUESTIONS.length
+              ? 'All six. The model holds.'
+              : 'Done. Re-read the sections for the ones you missed — the snowflake is worth having straight.')
+          : answered + ' of ' + QUESTIONS.length + ' answered.';
+      });
+    });
+  }
+  document.getElementById('resetQuiz').addEventListener('click', buildQuiz);
+  buildQuiz();
+
+  /* init */
+  setCompare('star');
+})();
+</script>
+</body>
+</html>
